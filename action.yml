@@ -1,0 +1,51 @@
+name: 'Sync actions cache'
+description: 'Sync actions cache and clean up old files'
+inputs:
+  deleteAfter:
+    description: 'Number of days after which files should be deleted'
+    required: false
+    default: "180"
+  actionsFolder:
+    description: 'Folder that actions are downloaded to'
+    required: false
+    default: "/actions-runner/_work/_actions"
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        #for each tar.gz in ${{ inputs.actionsFolder }}, see if it is in $ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE
+        #if not, copy it over
+        for dir in ${{ inputs.actionsFolder }}/*/*/*; do
+          if [ -d "$dir" ]; then
+            # Extract owner, repo, and ref from the path
+            owner=$(basename "$(dirname "$(dirname "$dir")")")
+            repo=$(basename "$(dirname "$dir")")
+            ref=$(basename "$dir")
+            
+            # Construct the destination directory and file name:
+            # Destination directory: $ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE/owner_repo
+            # Destination file: ref.tar.gz within that directory
+            dest_dir="$ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE/${owner}_${repo}"
+            dest_file="$dest_dir/${ref}.tar.gz"
+            
+            # Check if the tarball file already exists
+            if [ ! -f "$dest_file" ]; then
+              echo "Tarball for $owner/$repo ($ref) not found. Downloading..."
+              # Create the destination directory if it does not exist
+              mkdir -p "$dest_dir"
+              
+              # Download the tarball from GitHub API
+              curl -sL "https://api.github.com/repos/${owner}/${repo}/tarball/${ref}" -o "$dest_file"
+              
+              if [ $? -eq 0 ]; then
+                echo "Downloaded tarball to $dest_file"
+              else
+                echo "Failed to download tarball for $owner/$repo ($ref)" >&2
+              fi
+            else
+              echo "Tarball $dest_file already exists. Skipping download."
+            fi
+          fi
+        done
+        find "$ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE" -type f -mtime +${{ inputs.deleteAfter }} -exec rm -f {} \;
