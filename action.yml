@@ -1,5 +1,5 @@
-name: 'Sync actions cache'
-description: 'Sync actions cache and clean up old files'
+name: 'Save actions cache'
+description: 'Save actions cache and clean up old files'
 branding:
   icon: at-sign
   color: purple

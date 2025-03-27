@@ -97,14 +97,14 @@ jobs:
     runs-on: cg-linux # or whatever you named your runner
     ...
     steps:
-    - name: Sync actions cache
-      uses: catglobe/sync-actions-cache@v1
+    - name: Save actions cache
+      uses: catglobe/save-actions-cache@v1
   OtherJob:
     runs-on: cg-linux # or whatever you named your runner
     ...
     steps:
-    - name: Sync actions cache
-      uses: catglobe/sync-actions-cache@v1
+    - name: Save actions cache
+      uses: catglobe/save-actions-cache@v1
   PublicRunnerJob:
     #No runs-on: ==> don't add the step
 ```
@@ -113,8 +113,8 @@ Replace `catglobe` with your own company name or GitHub username if you made a f
 If your `work` folder is not in `/actions-runner/_work`, you can set `actionsFolder` to your path (don't forget to append `/actions`):
 
 ```yaml
-    - name: Sync actions cache
-      uses: catglobe/sync-actions-cache@v1
+    - name: Save actions cache
+      uses: catglobe/save-actions-cache@v1
       with:
         actionsFolder: /my_custom_work_folder/actions
 ```
