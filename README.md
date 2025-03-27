@@ -98,13 +98,13 @@ jobs:
     ...
     steps:
     - name: Sync actions cache
-      uses: catglobe/sync-actions-cache
+      uses: catglobe/sync-actions-cache@v1
   OtherJob:
     runs-on: cg-linux # or whatever you named your runner
     ...
     steps:
     - name: Sync actions cache
-      uses: catglobe/sync-actions-cache
+      uses: catglobe/sync-actions-cache@v1
   PublicRunnerJob:
     #No runs-on: ==> don't add the step
 ```
@@ -114,7 +114,7 @@ If your `work` folder is not in `/actions-runner/_work`, you can set `actionsFol
 
 ```yaml
     - name: Sync actions cache
-      uses: catglobe/sync-actions-cache
+      uses: catglobe/sync-actions-cache@v1
       with:
         actionsFolder: /my_custom_work_folder/actions
 ```
