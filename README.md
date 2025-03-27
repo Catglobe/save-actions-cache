@@ -89,7 +89,7 @@ spec:
       - emptyDir: {}
         name: work
 ```
-1. 3. If you care about security, fork this repository. That prevents any attack vector from being introduced in the future.
+3. If you care about security, fork this repository. That prevents any attack vector from being introduced in the future.
 4. Add this to all of your actions workflows:
 ```yaml
 jobs:
