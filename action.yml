@@ -1,5 +1,8 @@
 name: 'Sync actions cache'
 description: 'Sync actions cache and clean up old files'
+branding:
+  icon: at-sign
+  color: purple
 inputs:
   deleteAfter:
     description: 'Number of days after which files should be deleted'
