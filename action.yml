@@ -62,7 +62,7 @@ runs:
         
         # Ensure actionsFolder is in Windows format and prepend C: if necessary
         if ($actionsFolder -notmatch "^[A-Za-z]:\\") {
-          if ($actionsFolder -startsWith "/") {
+          if ($actionsFolder.StartsWith("/")) {
             # If it starts with a slash, treat it as a relative path and prepend C:\
             $actionsFolder = "C:" + $actionsFolder
           }
