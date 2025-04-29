@@ -59,19 +59,34 @@ runs:
         $actionsFolder = "${{ inputs.actionsFolder }}"
         $deleteAfter = ${{ inputs.deleteAfter }}
         $cacheFolder = $env:ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE
-
+        
+        # Ensure actionsFolder is in Windows format and prepend C: if necessary
+        if ($actionsFolder -notmatch "^[A-Za-z]:\\") {
+          if ($actionsFolder -startsWith "/") {
+            # If it starts with a slash, treat it as a relative path and prepend C:\
+            $actionsFolder = "C:" + $actionsFolder
+          }
+        }
+        $actionsFolder = $actionsFolder -replace '/', '\\'
+        
         Get-ChildItem -Path "$actionsFolder" -Recurse -Directory | ForEach-Object {
           $dir = $_.FullName
           $owner = (Split-Path -Path (Split-Path -Path $dir -Parent) -Leaf)
           $repo = (Split-Path -Path $dir -Parent | Split-Path -Leaf)
           $ref = (Split-Path -Path $dir -Leaf)
           $destDir = Join-Path -Path $cacheFolder -ChildPath "${owner}_${repo}"
+          
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $destDir)) {
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          }
+        
           $destFile = Join-Path -Path $destDir -ChildPath "${ref}.zip"
-
+        
           if (-Not (Test-Path -Path $destFile)) {
             Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading..."
-            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-            Invoke-WebRequest -Uri "https://api.github.com/repos/${owner}/${repo}/zipball/${ref}" -OutFile $destFile
+            $url = "https://api.github.com/repos/$owner/$repo/zipball/$ref"
+            Invoke-WebRequest -Uri $url -OutFile $destFile
             if ($?) {
               Write-Host "Downloaded zip file to $destFile"
             } else {
@@ -81,7 +96,8 @@ runs:
             Write-Host "Zip file $destFile already exists. Skipping download."
           }
         }
-
+        
+        # Cleanup older files
         Get-ChildItem -Path $cacheFolder -Recurse -File | Where-Object {
           $_.LastWriteTime -lt (Get-Date).AddDays(-$deleteAfter)
         } | Remove-Item -Force
