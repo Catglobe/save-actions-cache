@@ -16,12 +16,12 @@ runs:
   using: 'composite'
   steps:
     - shell: bash
+      if: runner.os != 'Windows'
       run: |
         #for each tar.gz in ${{ inputs.actionsFolder }}, see if it is in $ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE
         #if not, copy it over
         for dir in ${{ inputs.actionsFolder }}/*/*/*; do
           if [ -d "$dir" ]; then
-            # Extract owner, repo, and ref from the path
             owner=$(basename "$(dirname "$(dirname "$dir")")")
             repo=$(basename "$(dirname "$dir")")
             ref=$(basename "$dir")
@@ -52,3 +52,36 @@ runs:
           fi
         done
         find "$ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE" -type f -mtime +${{ inputs.deleteAfter }} -exec rm -f {} \;
+
+    - shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        $actionsFolder = "${{ inputs.actionsFolder }}"
+        $deleteAfter = ${{ inputs.deleteAfter }}
+        $cacheFolder = $env:ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE
+
+        Get-ChildItem -Path "$actionsFolder" -Recurse -Directory | ForEach-Object {
+          $dir = $_.FullName
+          $owner = (Split-Path -Path (Split-Path -Path $dir -Parent) -Leaf)
+          $repo = (Split-Path -Path $dir -Parent | Split-Path -Leaf)
+          $ref = (Split-Path -Path $dir -Leaf)
+          $destDir = Join-Path -Path $cacheFolder -ChildPath "${owner}_${repo}"
+          $destFile = Join-Path -Path $destDir -ChildPath "${ref}.zip"
+
+          if (-Not (Test-Path -Path $destFile)) {
+            Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading..."
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            Invoke-WebRequest -Uri "https://api.github.com/repos/${owner}/${repo}/zipball/${ref}" -OutFile $destFile
+            if ($?) {
+              Write-Host "Downloaded zip file to $destFile"
+            } else {
+              Write-Error "Failed to download zip file for $owner/$repo ($ref)"
+            }
+          } else {
+            Write-Host "Zip file $destFile already exists. Skipping download."
+          }
+        }
+
+        Get-ChildItem -Path $cacheFolder -Recurse -File | Where-Object {
+          $_.LastWriteTime -lt (Get-Date).AddDays(-$deleteAfter)
+        } | Remove-Item -Force
