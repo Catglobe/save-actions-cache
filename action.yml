@@ -84,8 +84,8 @@ runs:
           $destFile = Join-Path -Path $destDir -ChildPath "${ref}.zip"
         
           if (-Not (Test-Path -Path $destFile)) {
-            Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading..."
             $url = "https://api.github.com/repos/$owner/$repo/zipball/$ref"
+            Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading $url..."
             Invoke-WebRequest -Uri $url -OutFile $destFile
             if ($?) {
               Write-Host "Downloaded zip file to $destFile"
