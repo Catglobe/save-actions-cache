@@ -69,23 +69,31 @@ runs:
         }
         $actionsFolder = $actionsFolder -replace '/', '\\'
         
-        Get-ChildItem -Path "$actionsFolder" -Recurse -Directory | ForEach-Object {
-          $dir = $_.FullName
-          $owner = (Split-Path -Path (Split-Path -Path $dir -Parent) -Leaf)
-          $repo = (Split-Path -Path $dir -Parent | Split-Path -Leaf)
-          $ref = (Split-Path -Path $dir -Leaf)
-          $destDir = Join-Path -Path $cacheFolder -ChildPath "${owner}_${repo}"
+        # Search for files matching the pattern "actionsFolder\owner\repo\ref.completed"
+        Get-ChildItem -Path "$actionsFolder\*\*\*.completed" -File | ForEach-Object {
+          $file = $_
+        
+          # Split the full path and take the last 3 parts (owner, repo, ref)
+          $parts = $file.FullName -split '\\'
           
+          # Extract owner, repo, and ref (last three parts of the path)
+          $owner = $parts[-3]
+          $repo = $parts[-2]
+          $ref = $file.BaseName  # Filename without .completed extension
+        
+          # Define the destination directory and file path
+          $destDir = Join-Path -Path $cacheFolder -ChildPath "${owner}_${repo}"
+          $destFile = Join-Path -Path $destDir -ChildPath "${ref}.zip"
+        
           # Ensure the directory exists
           if (-Not (Test-Path -Path $destDir)) {
             New-Item -ItemType Directory -Force -Path $destDir | Out-Null
           }
         
-          $destFile = Join-Path -Path $destDir -ChildPath "${ref}.zip"
-        
+          # If the zip file doesn't exist, download it
           if (-Not (Test-Path -Path $destFile)) {
+            Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading..."
             $url = "https://api.github.com/repos/$owner/$repo/zipball/$ref"
-            Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading $url..."
             Invoke-WebRequest -Uri $url -OutFile $destFile
             if ($?) {
               Write-Host "Downloaded zip file to $destFile"
