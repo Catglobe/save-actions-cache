@@ -12,11 +12,16 @@ inputs:
     description: 'Folder that actions are downloaded to'
     required: false
     default: "/actions-runner/_work/_actions"
+  token:
+    description: 'Token used to download action archives. Defaults to the workflow token, which only has access to the current repository; pass a PAT or GitHub App token via a secret to cache actions from other private repositories.'
+    required: false
 runs:
   using: 'composite'
   steps:
     - shell: bash
       if: runner.os != 'Windows'
+      env:
+        ACTION_CACHE_TOKEN: ${{ inputs.token || github.token }}
       run: |
         #for each tar.gz in ${{ inputs.actionsFolder }}, see if it is in $ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE
         #if not, copy it over
@@ -38,13 +43,17 @@ runs:
               # Create the destination directory if it does not exist
               mkdir -p "$dest_dir"
               
-              # Download the tarball from GitHub API
-              curl -sL "https://api.github.com/repos/${owner}/${repo}/tarball/${ref}" -o "$dest_file"
-              
-              if [ $? -eq 0 ]; then
+              # Download the tarball from GitHub API. -f makes curl fail on HTTP
+              # errors (an unauthenticated private repo returns a JSON 404 body),
+              # and the move only happens on success, so the cache can never end
+              # up holding an error page that breaks every later job.
+              tmp_file="$dest_file.tmp.$$"
+              if curl -fsSL -H "Authorization: Bearer $ACTION_CACHE_TOKEN" "https://api.github.com/repos/${owner}/${repo}/tarball/${ref}" -o "$tmp_file"; then
+                mv "$tmp_file" "$dest_file"
                 echo "Downloaded tarball to $dest_file"
               else
-                echo "Failed to download tarball for $owner/$repo ($ref)" >&2
+                rm -f "$tmp_file"
+                echo "::warning::Failed to download tarball for $owner/$repo ($ref); no cache entry was created"
               fi
             else
               echo "Tarball $dest_file already exists. Skipping download."
@@ -55,6 +64,8 @@ runs:
 
     - shell: pwsh
       if: runner.os == 'Windows'
+      env:
+        ACTION_CACHE_TOKEN: ${{ inputs.token || github.token }}
       run: |
         $actionsFolder = "${{ inputs.actionsFolder }}"
         $deleteAfter = ${{ inputs.deleteAfter }}
@@ -94,11 +105,17 @@ runs:
           if (-Not (Test-Path -Path $destFile)) {
             Write-Host "Zip file for $owner/$repo ($ref) not found. Downloading..."
             $url = "https://api.github.com/repos/$owner/$repo/zipball/$ref"
-            Invoke-WebRequest -Uri $url -OutFile $destFile
-            if ($?) {
+            # Download to a temp name and only move it into place on success, so a
+            # failed request can never leave a stored archive that corrupts later jobs.
+            $tmpFile = "$destFile.tmp.$PID"
+            try {
+              Invoke-WebRequest -Uri $url -Headers @{ Authorization = "Bearer $env:ACTION_CACHE_TOKEN" } -OutFile $tmpFile -ErrorAction Stop
+              Move-Item -Path $tmpFile -Destination $destFile -Force
               Write-Host "Downloaded zip file to $destFile"
-            } else {
-              Write-Error "Failed to download zip file for $owner/$repo ($ref)"
+            }
+            catch {
+              Remove-Item -Path $tmpFile -ErrorAction SilentlyContinue
+              Write-Host "::warning::Failed to download zip file for $owner/$repo ($ref): $_"
             }
           } else {
             Write-Host "Zip file $destFile already exists. Skipping download."
